@@ -1,1 +1,31 @@
-const _0x3d5e=['exports','./helpers/init','./protocols/vless','./protocols/trojan','./helpers/helpers','./authentication/auth','Upgrade','websocket','startsWith','panel','sub','login','logout','error','secrets','favicon.ico','tr','urlOrigin','toString','302'];(function(_0x4b8c0b,_0x3d5e9e){const  _0x1a8b0a=function(_0x2b7a8e){while(--_0x2b7a8e){_0x4b8c0b['push'](_0x4b8c0b['shift']());}};_0x1a8b0a(++_0x3d5e9e);}(_0x3d5e,0x1b3));const _0x1a8b=function(_0x4b8c0b,_0x3d5e9e){_0x4b8c0b=_0x4b8c0b-0x0;let _0x1a8b0a=_0x3d5e[_0x4b8c0b];return _0x1a8b0a;};import{initializeParams as _0x2b7a8e}from _0x1a8b('0x1');import{VLOverWSHandler as _0x2e1f3d}from _0x1a8b('0x2');import{TROverWSHandler as _0x5a6b7c}from _0x1a8b('0x3');import{fallback as _0x4c2d9f,serveIcon as _0x3f1a5e,renderError as _0x5d3b8c,renderSecrets as _0x1e4f2a,handlePanel as _0x3a6d1b,handleSubscriptions as _0x2f8c7d,handleLogin as _0x4e9a2f}from _0x1a8b('0x4');import{logout as _0x3c6d4a}from _0x1a8b('0x5');export default{async fetch(_0x3e5a8d,_0x5b9e7a){try{_0x2b7a8e(_0x3e5a8d,_0x5b9e7a);const{pathName:_0x3b2a4d}=globalThis;const _0x2e8f9a=_0x3e5a8d['headers'][_0x1a8b('0x6')]();if(!_0x2e8f9a||_0x2e8f9a!==_0x1a8b('0x7')){if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0x9')))return await _0x3a6d1b(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xa')))return await _0x2f8c7d(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xb')))return await _0x4e9a2f(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xc')))return await _0x3c6d4a(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xd')))return await _0x5d3b8c();if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xe')))return await _0x1e4f2a();if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xf')))return await _0x3f1a5e();return await _0x4c2d9f(_0x3e5a8d);}else{return _0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0x10'))?await _0x5a6b7c(_0x3e5a8d):await _0x2e1f3d(_0x3e5a8d);}}catch(_0x3a1d2e){return Response['redirect'](`${globalThis[_0x1a8b('0x11')]}/error?error=${_0x3a1d2e[_0x1a8b('0x12')]()}`,_0x1a8b('0x13'));}}};
+import { initializeParams } from './helpers/init';
+import { VLOverWSHandler } from './protocols/vless';
+import { TROverWSHandler } from './protocols/trojan';
+import { fallback, serveIcon, renderError, renderSecrets, handlePanel, handleSubscriptions, handleLogin } from './helpers/helpers';
+import { logout } from './authentication/auth';
+
+export default {
+	async fetch(request, env) {
+		try {
+			initializeParams(request, env);
+			const { pathName } = globalThis;
+			const upgradeHeader = request.headers.get('Upgrade');
+			if (!upgradeHeader || upgradeHeader !== 'websocket') {
+				if (pathName.startsWith('/panel')) return await handlePanel(request, env);
+				if (pathName.startsWith('/sub')) return await handleSubscriptions(request, env);
+				if (pathName.startsWith('/login')) return await handleLogin(request, env);
+				if (pathName.startsWith('/logout')) return await logout(request, env);
+				if (pathName.startsWith('/error')) return await renderError();
+				if (pathName.startsWith('/secrets')) return await renderSecrets();
+				if (pathName.startsWith('/favicon.ico')) return await serveIcon();
+				return await fallback(request);
+			} else {
+				return pathName.startsWith('/tr')
+					? await TROverWSHandler(request)
+					: await VLOverWSHandler(request);
+			}
+		} catch (error) {
+			return Response.redirect(`${globalThis.urlOrigin}/error?error=${error.toString()}`, 302);
+		}
+	}
+};
