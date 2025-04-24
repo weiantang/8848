@@ -1,55 +1,53 @@
-名称：构建和发布
+name: Build Obfuscate BPB Panel
 
-权限:
-  目录：写
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 1 * * *"
 
-在：
-  工作流触发:
+permissions:
+  contents: write
 
-工作：
-  构建：
-    运行于：ubuntu-latest
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-    步骤：
-      - 名称: 查看代码
-        使用：actions/checkout@v4
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
 
-      - 名称: 获取发布版本
-        id： 获取版本
-        运行：echo "RELEASE_VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
 
-      - 名称: 检查发布版本
-        运行： 回显“发布版本是 $RELEASE_VERSION”
+      - name: Install dependencies
+        run: |
+          npm install -g javascript-obfuscator
 
-      - 名称: 设置 Node.js
-        使用： actions/setup-node@v4
-        与：
-          节点版本： "最新"
+      - name: Clone BPB workjs
+        run: |
+          wget -O origin.js https://raw.githubusercontent.com/bia-pain-bache/BPB-Worker-Panel/refs/heads/main/build/unobfuscated-worker.js
 
-      - 名称: 安装依赖项
-        运行：npm install
+      - name: Obfuscate BPB worker js
+        run: |
+          javascript-obfuscator origin.js --output _worker.js \
+          --compact true \
+          --identifier-names-generator hexadecimal \
+          --rename-globals true \
+          --string-array true \
+          --string-array-encoding 'base64' \
+          --string-array-threshold 0.75 \
+          --transform-object-keys true \
+          --self-defending false \
+          --simplify true
 
-      - 名称: 构建项目
-        运行： npm run build
-
-      - 名称：阅读发行说明
-        id： 读取_发布
-        壳：bash
-        运行： |
-          r=$(cat RELEASE.md)         
-          r="${r//''%''/'%25'}"                               
-          r="${r//$'n'/%0A'}"                             
-          r="${r//''/%0D}"}                             
-          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          
-
-      - 名称: 上传发布资产
-        使用：svenstaro/upload-release-action@v2
-        与:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          文件：dist/*
-          标签： v${{ env.版本 }}
-          release_name: 发布 v${{ env.RELEASE_VERSION }}
-          覆盖：真
-          文件通配符：真
-          预发布：真
-          body: ${{ steps.read_release.outputs.RELEASE_BODY }}
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: main
+          commit_message: ':arrow_up: update latest bpb panel'
+          commit_author: 'github-actions[bot] <github-actions[bot]@users.noreply.github.com>'
+          push_options: '--set-upstream'
