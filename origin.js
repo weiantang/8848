@@ -1,1 +1,114 @@
-const _0x3d5e=['exports','./helpers/init','./protocols/vless','./protocols/trojan','./helpers/helpers','./authentication/auth','Upgrade','websocket','startsWith','panel','sub','login','logout','error','secrets','favicon.ico','tr','urlOrigin','toString','302'];(function(_0x4b8c0b,_0x3d5e9e){const  _0x1a8b0a=function(_0x2b7a8e){while(--_0x2b7a8e){_0x4b8c0b['push'](_0x4b8c0b['shift']());}};_0x1a8b0a(++_0x3d5e9e);}(_0x3d5e,0x1b3));const _0x1a8b=function(_0x4b8c0b,_0x3d5e9e){_0x4b8c0b=_0x4b8c0b-0x0;let _0x1a8b0a=_0x3d5e[_0x4b8c0b];return _0x1a8b0a;};import{initializeParams as _0x2b7a8e}from _0x1a8b('0x1');import{VLOverWSHandler as _0x2e1f3d}from _0x1a8b('0x2');import{TROverWSHandler as _0x5a6b7c}from _0x1a8b('0x3');import{fallback as _0x4c2d9f,serveIcon as _0x3f1a5e,renderError as _0x5d3b8c,renderSecrets as _0x1e4f2a,handlePanel as _0x3a6d1b,handleSubscriptions as _0x2f8c7d,handleLogin as _0x4e9a2f}from _0x1a8b('0x4');import{logout as _0x3c6d4a}from _0x1a8b('0x5');export default{async fetch(_0x3e5a8d,_0x5b9e7a){try{_0x2b7a8e(_0x3e5a8d,_0x5b9e7a);const{pathName:_0x3b2a4d}=globalThis;const _0x2e8f9a=_0x3e5a8d['headers'][_0x1a8b('0x6')]();if(!_0x2e8f9a||_0x2e8f9a!==_0x1a8b('0x7')){if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0x9')))return await _0x3a6d1b(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xa')))return await _0x2f8c7d(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xb')))return await _0x4e9a2f(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xc')))return await _0x3c6d4a(_0x3e5a8d,_0x5b9e7a);if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xd')))return await _0x5d3b8c();if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xe')))return await _0x1e4f2a();if(_0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0xf')))return await _0x3f1a5e();return await _0x4c2d9f(_0x3e5a8d);}else{return _0x3b2a4d[_0x1a8b('0x8')](_0x1a8b('0x10'))?await _0x5a6b7c(_0x3e5a8d):await _0x2e1f3d(_0x3e5a8d);}}catch(_0x3a1d2e){return Response['redirect'](`${globalThis[_0x1a8b('0x11')]}/error?error=${_0x3a1d2e[_0x1a8b('0x12')]()}`,_0x1a8b('0x13'));}}};
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname as pathDirname } from 'path';
+import { fileURLToPath } from 'url';
+import { build } from 'esbuild';
+import { sync } from 'glob';
+import { minify as jsMinify } from 'terser';
+import { minify as htmlMinify } from 'html-minifier';
+import JSZip from "jszip";
+import obfs from 'javascript-obfuscator';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = pathDirname(__filename);
+
+const ASSET_PATH = join(__dirname, '../src/assets');
+const DIST_PATH = join(__dirname, '../dist/');
+
+async function processHtmlPages() {
+    const indexFiles = sync('**/index.html', { cwd: ASSET_PATH });
+    const result = {};
+
+    for (const relativeIndexPath of indexFiles) {
+        const dir = pathDirname(relativeIndexPath);
+        const base = (file) => join(ASSET_PATH, dir, file);
+
+        const indexHtml = readFileSync(base('index.html'), 'utf8');
+        const styleCode = readFileSync(base('style.css'), 'utf8');
+        const scriptCode = readFileSync(base('script.js'), 'utf8');
+
+        const finalScriptCode = await jsMinify(scriptCode);
+        const finalHtml = indexHtml
+            .replace(/__STYLE__/g, `<style>${styleCode}</style>`)
+            .replace(/__SCRIPT__/g, finalScriptCode.code);
+
+        const minifiedHtml = htmlMinify(finalHtml, {
+            collapseWhitespace: true,
+            removeAttributeQuotes: true,
+            minifyCSS: true
+        });
+
+        result[dir] = JSON.stringify(minifiedHtml);
+    }
+
+    console.log('✅ Assets bundled successfuly!');
+    return result;
+}
+
+async function buildWorker() {
+
+    const htmls = await processHtmlPages();
+    const faviconBuffer = readFileSync('./src/assets/favicon.ico');
+    const faviconBase64 = faviconBuffer.toString('base64');
+
+    const code = await build({
+        entryPoints: [join(__dirname, '../src/worker.js')],
+        bundle: true,
+        format: 'esm',
+        write: false,
+        external: ['cloudflare:sockets'],
+        platform: 'node',
+        define: {
+            __PANEL_HTML_CONTENT__: htmls['panel'] ?? '""',
+            __LOGIN_HTML_CONTENT__: htmls['login'] ?? '""',
+            __ERROR_HTML_CONTENT__: htmls['error'] ?? '""',
+            __SECRETS_HTML_CONTENT__: htmls['secrets'] ?? '""',
+            __ICON__: JSON.stringify(faviconBase64)
+        }
+    });
+    
+    console.log('✅ Worker built successfuly!');
+
+    const minifiedCode = await jsMinify(code.outputFiles[0].text, {
+        module: true,
+        output: {
+            comments: false
+        }
+    });
+
+    console.log('✅ Worker minified successfuly!');
+
+    const obfuscationResult = obfs.obfuscate(minifiedCode.code, {
+        stringArrayThreshold: 1,
+        stringArrayEncoding: [
+            "rc4"
+        ],
+        numbersToExpressions: true,
+        transformObjectKeys: true,
+        renameGlobals: true,
+        deadCodeInjection: true,
+        deadCodeInjectionThreshold: 0.2,
+        simplify: true,
+        compact: true,
+        target: "node"
+    });
+
+    const worker = obfuscationResult.getObfuscatedCode();
+    console.log('✅ Worker obfuscated successfuly!');
+
+    mkdirSync(DIST_PATH, { recursive: true });
+    writeFileSync('./dist/worker.js', worker, 'utf8');
+
+    const zip = new JSZip();
+    zip.file('_worker.js', worker);
+    zip.generateAsync({
+        type: 'nodebuffer',
+        compression: 'DEFLATE'
+    }).then(nodebuffer => writeFileSync('./dist/worker.zip', nodebuffer));
+
+    console.log('✅ Worker files published successfuly!');
+}
+
+buildWorker().catch(err => {
+    console.error('❌ Build failed:', err);
+    process.exit(1);
+});
